@@ -1,43 +1,93 @@
 import os
+import threading
+import sys
+
+args = sys.argv
+
+verbose = False
+
+if "verbose" in args:
+    verbose = True
+
+for arg in args:
+    if "verbose" in arg or "v" in arg:
+        verbose = True
 
 # Get input
 inputFolder = input("Enter the path of the folder to scan: ")
 directorySizes = []
+totalSize = 0
+errors = 0
 
-# Calcualate sizes for 
-def scanFolder(folder):
-    global directorySizes
+def sizeString(size):
+    if size == 0:
+        return "empty"
+    elif size >= 500000000:
+        Gb = size / 1000000000
+        return str(Gb) + " Gb"
+    elif size >= 750000:
+        Mb = size / 1000000
+        return str(Mb) + " Mb"
+    elif size >= 1000:
+        Kb = size / 1000
+        return str(Kb) + " Kb"
+    else:
+        return str(size) + " bytes"
+
+# Scan a folder
+def scan(rootDir, dir):
+    global directorySizes, errors, verbose
     
+    size = 0
+        
+    try:
+        for root, dirs, files in os.walk(os.path.join(rootDir, dir)):
+            try:
+                for file in files:
+                    pth = os.path.join(root, file)
+                    thisSize = os.path.getsize(pth)
+                    
+                    if verbose:
+                        print("<VERBOSE>      Scanning: '" + str(pth) + "'")
+                    
+                    size += thisSize
+            except:
+                errors += 1
+                pass
+    except:
+        errors += 1
+        pass
+    
+    directorySizes.append((dir, size))
+    
+    print("Finished calculating size for '" + str(dir) + "' with size: " + sizeString(size))
+
+# Calcualate sizes for each first-level subfolder of the inputted folder
+def scanFolder(folder):
+    global directorySizes, totalSize, errors
+    
+    totalSize = 0
+    errors = 0
+
     directorySizes = []
 
     print("")
     print("Calculating directory sizes for " + folder)
     print("")
-
-    split = folder.split("\\")
-    folderName = split[len(split) - 1]
-    
+        
     dirsToScan = [f for f in os.listdir(folder) if os.path.isdir(os.path.join(folder, f))]
     
-    errors = 0
+    scanThreads = []
+    
+    # Create and start scan threads
     for dir in dirsToScan:
-        print("Calculating size for: " + dir)
-        
-        size = 0
-        
-        try:
-            for root, dirs, files in os.walk(os.path.join(folder, dir)):
-                try:
-                    for file in files:
-                        size += os.path.getsize(os.path.join(root, file))
-                except:
-                    errors += 1
-                    pass
-        except:
-            errors += 1
-            pass
-        
-        directorySizes.append((dir, size))
+        thread = threading.Thread(target = scan, args = [folder, dir])
+        thread.start()
+        scanThreads.append(thread)
+    
+    # Join every scan thread
+    for thread in scanThreads:
+        thread.join()
     
     print("")
     print("Finished calculating directory sizes for the target folder with " + str(errors) + " error(s)")
@@ -45,43 +95,48 @@ def scanFolder(folder):
     
     # Sort
     directorySizes.sort(key = lambda x: x[1], reverse = True)
-    
+        
+    print("----------------------")
     print("")
-    print("Sorted the folder by size")
-    print("")
-    print("")
-    
+
     # Print out finished list
     index = 0
+    totalSize = 0
     printed = ""
+    topPrint = ""
+    
     for directoryAndSize in directorySizes:
         index += 1
         
-        toPrint = ""
-        if directoryAndSize[1] == 0:
-            toPrint = str(index) + ". '" + directoryAndSize[0] + "' is empty"
-        elif directoryAndSize[1] >= 500000000:
-            Gb = directoryAndSize[1] / 1000000000
-            toPrint = str(index) + ". '" + directoryAndSize[0] + "' = " + str(Gb) + " Gb"
-        elif directoryAndSize[1] >= 750000:
-            Mb = directoryAndSize[1] / 1000000
-            toPrint = str(index) + ". '" + directoryAndSize[0] + "' = " + str(Mb) + " Mb"
-        elif directoryAndSize[1] >= 1000:
-            Kb = directoryAndSize[1] / 1000
-            toPrint = str(index) + ". '" + directoryAndSize[0] + "' = " + str(Kb) + " Kb"
-        else:
-            toPrint = str(index) + ". '" + directoryAndSize[0] + "' = " + str(directoryAndSize[1]) + " bytes"
+        toPrint = str(index) + ". '" + str(directoryAndSize[0]) + "' = " + sizeString(directoryAndSize[1])
         
-        print(toPrint)
-        printed += "\n" + toPrint
+        totalSize += directoryAndSize[1]
+        
+        printed += toPrint + "\n"
+    
+    topPrint += "Total size of '" + str(folder) + "' = " + sizeString(totalSize) + "\n"
+    topPrint += "\n"
+    topPrint += "Directories of ' " + str(folder) + "' sorted by size:\n"
+    
+    printed = topPrint + printed
+
+    print(printed)
 
     # Save to file
+    print("----------------------")
     print("")
-    print("")
+
     print("Saving the list to a file...")
     print("")
     
     thisDir = os.path.dirname(os.path.realpath(__file__))
+    
+    if ":" in folder:
+        colonInd = folder.index(":")
+        folderName = folder[0 : colonInd]
+    else:
+        split = folder.split("\\")
+        folderName = split[len(split) - 1]
     
     with open(os.path.join(folderName, thisDir + "/folderSizes-" + folderName + ".txt"), "w") as file:
         file.write(printed)
@@ -90,7 +145,7 @@ def scanFolder(folder):
     
     print("Finished saving the list to a file")
 
-if inputFolder == "" or (not os.path.exists(inputFolder)) or (not os.path.isdir(inputFolder)):
+if inputFolder == None or inputFolder == "" or (not os.path.exists(inputFolder)) or (not os.path.isdir(inputFolder)):
     print("The path you entered is invalid, try again")
 else:
     scanFolder(inputFolder)
@@ -98,7 +153,9 @@ else:
 done = False
 
 while not done:
-    inStr = input("Type 'Quit' to finish, 'Open' to open the current directory in explorer, the path of a new directory, or type the index of the listed directory you want to scan next: ")
+    print("")
+
+    inStr = input("Type 'Quit', 'quit', or 'q' to close the program, 'Open', 'open', or 'o' to open the current directory in explorer, the path of a new directory to scan, or the index of the listed directory you want to scan next: ")
     
     if inStr == "Quit" or inStr == "quit" or inStr == "q":
         done = True
