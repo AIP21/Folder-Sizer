@@ -16,16 +16,16 @@ verbose = False
 shouldNotify = True
 
 for arg in args:
-    if "verbose" == arg or "v" == arg:
+    if "-Verbose" == arg or "-verbose" == arg or "-v" == arg:
         verbose = True
-        print("Verbose is true")
+        print("Verbose argument is true")
     
-    if "silent" == arg or "s" == arg:
+    if "-Silent" == arg or"-silent" == arg or "-s" == arg:
         shouldNotify = False
-        print("Silent is true")
-
+        print("Silent argument is true")
+    
 # Get input
-inputFolder = input("Enter the path of the folder to scan: ")
+inputFolder = input("Enter the path of the folder to scan: \n>  ")
 directorySizes = []
 totalSize = 0
 errors = 0
@@ -101,7 +101,6 @@ def scanFolder(folder):
 
     directorySizes = []
 
-    print("")
     print("Calculating directory sizes for " + folder)
     print("")
         
@@ -207,7 +206,7 @@ def scanFolder(folder):
     print("Finished saving the list to: " + str(fileName))
 
 if inputFolder == None or inputFolder == "" or (not os.path.exists(inputFolder)) or (not os.path.isdir(inputFolder)):
-    print("The path you entered is invalid, try again")
+    print("The directory path you entered is invalid! Try again.")
 else:
     scanFolder(inputFolder)
 
@@ -216,7 +215,9 @@ done = False
 while not done:
     print("")
 
-    inStr = input("Type 'Quit', 'quit', or 'q' to close the program, 'Rescan', 'rescan', or 'r' to rescan the current directory, 'Open', 'open', or 'o' to open the current directory in explorer, 'Back', 'back', or 'b' to rescan the last directory, the path of a new directory to scan, or the index of the listed directory you want to scan next: ")
+    inStr = input("Awaiting next command (type 'help' for info):\n>  ")
+    
+    print("")
     
     if inStr == "Quit" or inStr == "quit" or inStr == "q":
         done = True
@@ -224,22 +225,45 @@ while not done:
         os.system("explorer " + inputFolder)
     elif inStr == "Rescan" or inStr == "rescan" or inStr == "r":
         scanFolder(inputFolder)
+    elif inStr == "Help" or inStr == "help" or inStr == "h":
+         print("----------")
+         print("This is Folder Sizer by AIP21.")
+         print("----------")
+         print("List of valid CLI arguments:")
+         print("'-v', '-verbose', or '-Verbose': Make the program print out every scanned directory (significantly slows down scanning).")
+         print("'-s', '-silent', or '-Silent': Disable notifying the user when the scanning process is completed.")
+         print("----------")
+         print("Valid commands:")
+         print("'Quit', 'quit', or 'q': Close the program.")
+         print("'Rescan', 'rescan', or 'r': Rescan the current directory.")
+         print("'Open', 'open', or 'o': Open the current directory in explorer.")
+         print("'Back', 'back', or 'b': Go back to the last directory.")
+         print("'Help', 'help', or 'h' for help on the valid CLI arguments and commands.")
+         print("Path of a new directory to scan.")
+         print("Number of the listed directory you want to scan next.")
+         print("")
     elif inStr == "Back" or inStr == "back" or inStr == "b":
         scannedLength = len(dirsScanned)
         if scannedLength > 1:
              lastDir = dirsScanned[scannedLength - 2]
              dirsScanned.pop()
+             inputFolder = lastDir
              scanFolder(lastDir)
         else:
-             print("There are no prior directories.")
+             print("There are no previous directories! Try again.")
              continue;
     elif inStr.isdigit():
+        dirsLength = len(directorySizes)
+        if dirsLength == 0:
+            print("No listed directories to select from! Try again.")
+            continue
+        
         # Accomodate for having an empty \ at the end of the folder name
         if inputFolder.rfind('\\') == len(inputFolder) - 1:
             inputFolder = inputFolder[0 : len(inputFolder) - 1]
         
-        if int(inStr) - 1 >= len(directorySizes):
-            print("Given index is out of range, try again.")
+        if int(inStr) - 1 >= dirsLength:
+            print("Given index is out of range! Try again.")
             continue
     
         dirName = directorySizes[int(inStr) - 1][0]
@@ -247,7 +271,7 @@ while not done:
         scanFolder(inputFolder)
     else:
         if inStr == "" or (not os.path.exists(inStr)) or (not os.path.isdir(inStr)):
-            print("The path you entered is invalid, try again")
+            print("The command or directory path you entered is invalid! Try again")
             continue
         else:
             inputFolder = inStr
