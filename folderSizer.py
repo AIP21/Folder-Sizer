@@ -38,6 +38,8 @@ def sizeString(size):
 def scan(rootDir, dir):
     global directorySizes, errors, verbose
     
+    print("Starting to calculate size for " + dir)
+    
     size = 0
         
     try:
