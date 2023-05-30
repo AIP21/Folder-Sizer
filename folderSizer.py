@@ -2,22 +2,35 @@ import os
 import threading
 import sys
 
+canSendNotifications = True
+
+try:
+     from plyer import notification
+except:
+     print("plyer is not installed. This program will still function but will not be able to send notifications when it is finished.")
+     canSendNotifications = False
+
 args = sys.argv
 
 verbose = False
-
-if "verbose" in args:
-    verbose = True
+shouldNotify = True
 
 for arg in args:
-    if "verbose" in arg or "v" in arg:
+    if "verbose" == arg or "v" == arg:
         verbose = True
+        print("Verbose is true")
+    
+    if "silent" == arg or "s" == arg:
+        shouldNotify = False
+        print("Silent is true")
 
 # Get input
 inputFolder = input("Enter the path of the folder to scan: ")
 directorySizes = []
 totalSize = 0
 errors = 0
+dirsLength = 0
+curDirInd = 0
 
 def sizeString(size):
     if size == 0:
@@ -36,7 +49,7 @@ def sizeString(size):
 
 # Scan a folder
 def scan(rootDir, dir):
-    global directorySizes, errors, verbose
+    global directorySizes, errors, verbose, dirsLength, curDirInd
     
     print("Starting to calculate size for " + dir)
     
@@ -62,14 +75,25 @@ def scan(rootDir, dir):
     
     directorySizes.append((dir, size))
     
-    print("Finished calculating size for '" + str(dir) + "' with size: " + sizeString(size))
+    percentStr = "(" + str(round((curDirInd / dirsLength) * 100, 3)) + "%)"
+    
+    spaceCount = 10 - len(percentStr)
+    
+    for s in range(spaceCount):
+         percentStr += " "
+    
+    print(percentStr + "Finished calculating size for '" + str(dir) + "' with size: " + sizeString(size))
+    
+    curDirInd += 1
 
 # Calcualate sizes for each first-level subfolder of the inputted folder
 def scanFolder(folder):
-    global directorySizes, totalSize, errors
+    global directorySizes, totalSize, errors, dirsLength, curDirInd
     
     totalSize = 0
     errors = 0
+    
+    curDirInd = 0
 
     directorySizes = []
 
@@ -78,6 +102,8 @@ def scanFolder(folder):
     print("")
         
     dirsToScan = [f for f in os.listdir(folder) if os.path.isdir(os.path.join(folder, f))]
+    
+    dirsLength = len(dirsToScan)
     
     scanThreads = []
     
@@ -110,15 +136,22 @@ def scanFolder(folder):
     for directoryAndSize in directorySizes:
         index += 1
         
-        toPrint = str(index) + ". '" + str(directoryAndSize[0]) + "' = " + sizeString(directoryAndSize[1])
+        indStr = str(index) + "."
+        
+        spaceCount = (len(str(dirsLength)) + 1) - len(indStr)
+        
+        for s in range(spaceCount):
+            indStr += " "
+        
+        toPrint = indStr + " '" + str(directoryAndSize[0]) + "' = " + sizeString(directoryAndSize[1])
         
         totalSize += directoryAndSize[1]
         
         printed += toPrint + "\n"
     
-    topPrint += "Total size of '" + str(folder) + "' = " + sizeString(totalSize) + "\n"
+    topPrint += "Total size of all directories in '" + str(folder) + "' = " + sizeString(totalSize) + "\n"
     topPrint += "\n"
-    topPrint += "Directories of ' " + str(folder) + "' sorted by size:\n"
+    topPrint += "Directories of '" + str(folder) + "' sorted by size:\n"
     
     printed = topPrint + printed
 
@@ -133,19 +166,41 @@ def scanFolder(folder):
     
     thisDir = os.path.dirname(os.path.realpath(__file__))
     
-    if ":" in folder:
+    if "\\" not in folder and "/" not in folder:
         colonInd = folder.index(":")
         folderName = folder[0 : colonInd]
     else:
-        split = folder.split("\\")
+        newFolder = str(folder)
+        
+        # Accomodate for having an empty \ at the end of the folder name
+        if folder.rfind('\\') == len(folder) - 1:
+            newFolder = folder[0 : len(folder) - 1]
+        
+        split = newFolder .split("\\")
         folderName = split[len(split) - 1]
     
-    with open(os.path.join(folderName, thisDir + "/folderSizes-" + folderName + ".txt"), "w") as file:
+    fileName = os.path.join(folderName, thisDir + "/folderSizes-" + folderName + ".txt")
+    
+    with open(fileName , "w") as file:
         file.write(printed)
         
         file.close()
     
-    print("Finished saving the list to a file")
+    # Alert the user that we're done    
+    global shouldNotify, canSendNotifications
+    
+    if shouldNotify:
+        if canSendNotifications:
+             notificationTitle = "Scanning of directory '" + str(folderName) + "' is complete!"
+                 
+             # Limit characters to prevent notification error
+             notificationTitle = notificationTitle[0 : 64]
+            
+             notification.notify(app_name = "Folder Sizer", title = notificationTitle, message = "The list of directory sizes is printed to the console and saved to a file. Check the console for the path to the saved file.")
+        else:
+             print("\a")
+    
+    print("Finished saving the list to: " + str(fileName))
 
 if inputFolder == None or inputFolder == "" or (not os.path.exists(inputFolder)) or (not os.path.isdir(inputFolder)):
     print("The path you entered is invalid, try again")
@@ -164,6 +219,10 @@ while not done:
     elif inStr == "Open" or inStr == "open" or inStr == "o":
         os.system("explorer " + inputFolder)
     elif inStr.isdigit():
+        # Accomodate for having an empty \ at the end of the folder name
+        if inputFolder.rfind('\\') == len(inputFolder) - 1:
+            inputFolder = inputFolder[0 : len(inputFolder) - 1]
+    
         dirName = directorySizes[int(inStr) - 1][0]
         inputFolder += "\\" + dirName
         scanFolder(inputFolder)
