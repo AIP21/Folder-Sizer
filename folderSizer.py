@@ -31,6 +31,7 @@ totalSize = 0
 errors = 0
 dirsLength = 0
 curDirInd = 0
+dirsScanned = []
 
 def sizeString(size):
     if size == 0:
@@ -88,7 +89,10 @@ def scan(rootDir, dir):
 
 # Calcualate sizes for each first-level subfolder of the inputted folder
 def scanFolder(folder):
-    global directorySizes, totalSize, errors, dirsLength, curDirInd
+    global directorySizes, totalSize, errors, dirsLength, curDirInd, dirsScanned
+    
+    if folder not in dirsScanned:
+         dirsScanned.append(folder)
     
     totalSize = 0
     errors = 0
@@ -212,16 +216,31 @@ done = False
 while not done:
     print("")
 
-    inStr = input("Type 'Quit', 'quit', or 'q' to close the program, 'Open', 'open', or 'o' to open the current directory in explorer, the path of a new directory to scan, or the index of the listed directory you want to scan next: ")
+    inStr = input("Type 'Quit', 'quit', or 'q' to close the program, 'Rescan', 'rescan', or 'r' to rescan the current directory, 'Open', 'open', or 'o' to open the current directory in explorer, 'Back', 'back', or 'b' to rescan the last directory, the path of a new directory to scan, or the index of the listed directory you want to scan next: ")
     
     if inStr == "Quit" or inStr == "quit" or inStr == "q":
         done = True
     elif inStr == "Open" or inStr == "open" or inStr == "o":
         os.system("explorer " + inputFolder)
+    elif inStr == "Rescan" or inStr == "rescan" or inStr == "r":
+        scanFolder(inputFolder)
+    elif inStr == "Back" or inStr == "back" or inStr == "b":
+        scannedLength = len(dirsScanned)
+        if scannedLength > 1:
+             lastDir = dirsScanned[scannedLength - 2]
+             dirsScanned.pop()
+             scanFolder(lastDir)
+        else:
+             print("There are no prior directories.")
+             continue;
     elif inStr.isdigit():
         # Accomodate for having an empty \ at the end of the folder name
         if inputFolder.rfind('\\') == len(inputFolder) - 1:
             inputFolder = inputFolder[0 : len(inputFolder) - 1]
+        
+        if int(inStr) - 1 >= len(directorySizes):
+            print("Given index is out of range, try again.")
+            continue
     
         dirName = directorySizes[int(inStr) - 1][0]
         inputFolder += "\\" + dirName
